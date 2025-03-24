@@ -10,7 +10,7 @@ pygame.init()
 info = pygame.display.Info()
 largura = info.current_w
 altura = info.current_h
-tela = pygame.display.set_mode((largura, altura), pygame.FULLSCREEN)
+tela = pygame.display.set_mode((largura, altura), FULLSCREEN)
 pygame.display.set_caption('Simulador de colisões elásticas')
 relogio = pygame.time.Clock()
 
@@ -66,30 +66,64 @@ while True:
         # Detecta colisão com as paredes
         if bola["y"] + bola["raio"] + bola["vy"] >= altura or bola["y"] - bola["raio"] + bola["vy"] <= 0:
             bola["vy"] *= -1
-        if bola["x"] + bola["raio"] + bola["vx"] >= largura or bola["x"] - bola["raio"] + bola["vx"] <= 0:
+        elif bola["x"] + bola["raio"] + bola["vx"] >= largura or bola["x"] - bola["raio"] + bola["vx"] <= 0:
             bola["vx"] *= -1
 
     for i in range(0, n_bolas):
         for j in range(i + 1, n_bolas):
             # Calcula a posição futura das bolinhas
-            dx = (bolas[i]["x"] + bolas[i]["vx"]) - (bolas[j]["x"] + bolas[j]["vx"])
-            dy = (bolas[i]["y"] + bolas[i]["vy"]) - (bolas[j]["y"] + bolas[j]["vy"])
+            dx = bolas[i]["x"] - bolas[j]["x"]
+            dy = bolas[i]["y"] - bolas[j]["y"]
 
             distancia = math.sqrt(dx**2 + dy**2)
 
             # Verifica se há colisão na próxima posição
             if distancia <= bolas[i]["raio"] + bolas[j]["raio"]:
                 
-                vcmx = (bolas[i]["massa"]*bolas[i]["vx"] + bolas[j]["massa"]*bolas[j]["vx"]) / (bolas[i]["massa"] + bolas[j]["massa"])
-                vcmy = (bolas[i]["massa"]*bolas[i]["vy"] + bolas[j]["massa"]*bolas[j]["vy"]) / (bolas[i]["massa"] + bolas[j]["massa"])
+                # Separa as bolas caso a distância entre elas seja menor do que a soma dos raios
+                erro = bolas[i]["raio"] + bolas[j]["raio"] - distancia
+                nx = dx / distancia
+                ny = dy / distancia
+                bolas[i]["x"] += nx * (erro / 2)
+                bolas[i]["y"] += ny * (erro / 2)
+                bolas[j]["x"] -= nx * (erro / 2)
+                bolas[j]["y"] -= ny * (erro / 2)
 
-                aux = bolas[i]["vx"]
-                bolas[i]["vx"] = 2 * vcmx - bolas[i]["vx"]
-                bolas[j]["vx"] = (bolas[i]["massa"] * (aux - bolas[i]["vx"]) + bolas[j]["massa"] * bolas[j]["vx"]) / bolas[j]["massa"]
+                # Separa as bolas das bordas, caso tenham retornado para lá
+                if bolas[i]["x"] - bolas[i]["raio"] < 0:
+                    bolas[i]["x"] += bolas[i]["raio"] - bolas[i]["x"]
+                elif bolas[i]["x"] - bolas[i]["raio"] > largura:
+                    bolas[i]["x"] -= bolas[i]["raio"] - bolas[i]["x"]
+                elif bolas[i]["y"] - bolas[i]["raio"] < 0:
+                    bolas[i]["y"] += bolas[i]["raio"] - bolas[i]["y"]
+                elif bolas[i]["y"] - bolas[i]["raio"] > largura:
+                    bolas[i]["y"] -= bolas[i]["raio"] - bolas[i]["y"]
 
-                aux = bolas[i]["vy"]
-                bolas[i]["vy"] = 2 * vcmy - bolas[i]["vy"]
-                bolas[j]["vy"] = (bolas[i]["massa"] * (aux - bolas[i]["vy"]) + bolas[j]["massa"] * bolas[j]["vy"]) / bolas[j]["massa"]
+                # Vetor normal da colisão
+                nx = dx / distancia
+                ny = dy / distancia
+
+                 # Projeção escalar das velocidades no vetor normal
+                v1n = bolas[i]["vx"] * nx + bolas[i]["vy"] * ny
+                v2n = bolas[j]["vx"] * nx + bolas[j]["vy"] * ny
+
+                vcm = (bolas[i]["massa"]*v1n + bolas[j]["massa"]*v2n) / (bolas[i]["massa"] + bolas[j]["massa"])
+
+                # Velocidades após a colisão
+                v1n_final = 2*vcm - v1n
+                v2n_final = 2*vcm - v2n
+
+                # Componentes perpendicular ao vetor normal permanecem inalteradas
+                v1t_x = bolas[i]["vx"] - v1n * nx
+                v1t_y = bolas[i]["vy"] - v1n * ny
+                v2t_x = bolas[j]["vx"] - v2n * nx
+                v2t_y = bolas[j]["vy"] - v2n * ny
+
+                # Recompõe os vetores de velocidade final
+                bolas[i]["vx"] = v1n_final * nx + v1t_x
+                bolas[i]["vy"] = v1n_final * ny + v1t_y
+                bolas[j]["vx"] = v2n_final * nx + v2t_x
+                bolas[j]["vy"] = v2n_final * ny + v2t_y
 
     # Atualiza as posições após resolver as colisões
     for bola in bolas:
